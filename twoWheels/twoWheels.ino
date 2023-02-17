@@ -13,8 +13,8 @@
 #define ki 0.0005
 
 //counters for both encoders
-long int counterA=0;
-long int counterB=0;
+long int counterLeft=0;
+long int counterRight=0;
 
 //making globale variables for pid , so we can just use it in the function without passing it by address ;
 double errSum ;
@@ -48,20 +48,20 @@ void ReadEncoder_ISR_left(){
   int a= digitalRead(enc_left_A);
   int b= digitalRead(enc_left_B);
   if(a^b){
-    counterA ++;
+    counterLeft ++;
   }
   else{
-    counterA--;
+    counterLeft--;
   }
 }
 void ReadEncoderB_left(){
   int a= digitalRead(enc_left_A);
   int b= digitalRead(enc_left_B);
   if(!(a^b)){
-    counterA ++;
+    counterLeft ++;
   }
   else{
-    counterB--;
+    counterLeft--;
   }
 }
 
@@ -69,20 +69,20 @@ void ReadEncoder_ISR_right(){
   int a= digitalRead(enc_right_A);
   int b= digitalRead(enc_right_B);
   if(a^b){
-    counterB ++;
+    counterRight++;
   }
   else{
-    counterB--;
-  }
+    counterRight--;
 }
+  
 void ReadEncoderB_right(){
   int a= digitalRead(enc_right_A);
   int b= digitalRead(enc_right_B);
   if(!(a^b)){
-    counterB ++;
+    counterRight ++;
   }
   else{
-    counterB--;
+    counterRight--;
   }
 }
 
@@ -95,23 +95,23 @@ void goForward(int goal){
   //Used to adjust motors' speed 
   unsigned diff_l ;
   unsigned diff_r ; 
-  counterA = 0 ;
-  counterB = 0 ;
+  counterLeft = 0 ;
+  counterRight = 0 ;
   //prev counter 
-  unsigned long prevCounterA = 0 ; 
-  unsigned long prevCounterB = 0 ;
+  unsigned long prevCounterLeft = 0 ; 
+  unsigned long prevCounterRight = 0 ;
   unsigned long  now =0,lastTime=0 ;
   errSum=0 ;
   lastError=0;   
-  while((counterA<goal)&&(counterB<goal)){
+  while((counterLeft<goal)&&(counterRight<goal)){
     drive(power_left,power_right) ;
-    diff_l = counterA - prevCounterA ;
-    diff_r = counterB - prevCounterB ;
+    diff_l = counterLeft - prevCounterLeft ;
+    diff_r = counterRight - prevCounterRight ;
 
-    prevCounterA = counterA ;
-    prevCounterB = counterB ;
-    power_left = pidCount(goal,counterA) ;
-    power_right = pidCount(goal,counterB) ;
+    prevCounterLeft = counterLeft ;
+    prevCounterRight = counterRight ;
+    power_left = pidCount(goal,counterLeft) ;
+    power_right = pidCount(goal,counterRight) ;
     if(diff_l>diff_r){
       power_left -= power_left*0.05;
       power_right += power_right*0.05 ;    
