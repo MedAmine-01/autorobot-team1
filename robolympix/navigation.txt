@@ -1,0 +1,256 @@
+
+#include <TimerOne.h>
+
+#define ticks_per_rev 400
+#define wheel_rayon 40
+#define center_distance 185
+#define kdR 0.01
+#define kpR 1
+#define kiR 0.5
+#define kdL 0
+#define kpL 1
+#define kiL 0
+#define pi 3.14159265
+
+#define laserpin 4
+#define trig 12
+#define echo 13
+
+#define encoderRa 20
+#define encoderRb 21
+#define encoderLa 3
+#define encoderLb 2
+
+#define MR1 10
+#define MR2 11
+#define ML1 8
+#define ML2 9
+
+
+long counterR=0;
+long counterL=0;
+long prevCounterR=0;
+long prevCounterL=0;
+float distancePlaquemm=0;
+float vitesse=0;
+float wheel_perimeter= 2*pi*wheel_rayon;
+float tickmm=wheel_perimeter/ticks_per_rev;
+float setpoint = 100;
+float error=0;
+float prevError=0;
+float Integral=0;
+float Derivate=0;
+float output=0;
+unsigned long now=0;
+unsigned long lastTime=0;
+unsigned long dt=0;
+int a=0;
+int b=0;
+  
+TimerOne timer;    //   INTERRUPTION PROBLEMS MAY OCCUR 
+
+void setup()
+{
+  pinMode(encoderRa,INPUT_PULLUP);
+  pinMode(encoderRb,INPUT_PULLUP);
+  pinMode(encoderLa,INPUT_PULLUP);
+  pinMode(encoderLb,INPUT_PULLUP);
+  pinMode(laserpin,OUTPUT);
+  digitalWrite(laserpin,LOW);
+  pinMode(MR1,OUTPUT);
+  pinMode(ML1,OUTPUT);
+  pinMode(MR2,OUTPUT);
+  pinMode(ML2,OUTPUT);
+  pinMode(encoderRa,INPUT);
+  pinMode(encoderRa,INPUT);
+  attachInterrupt(digitalPinToInterrupt(encoderLa),ReadEncoderLa,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encoderRb),ReadEncoderLb,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encoderRa),ReadEncoderRa,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encoderRb),ReadEncoderRb,CHANGE); 
+
+  timer.initialize(100000);
+  timer.attachInterrupt(calculVitesse);  
+  timer.start();
+  Serial.begin(9600);
+ }
+
+void loop()
+{
+ while (tickstomm(counterL) < 100000 ){
+   moveML(700) ;
+ }
+ analogWrite(ML1,0);
+ analogWrite(ML2,0);
+  
+}
+
+void calculVitesse(){
+  float vitesseR=(tickstomm(counterR-prevCounterR))/0.1;
+  float vitesseL=(tickstomm(counterL-prevCounterL))/0.1;
+  vitesse =(vitesseR+vitesseL)/2;  
+  prevCounterR=counterR;
+  prevCounterL=counterL;
+}
+
+void ReadEncoderLa(){
+  int a= digitalRead(encoderLa);
+  int b= digitalRead(encoderLb);
+  if(a^b){
+    counterL ++;
+  }
+  else{
+    counterL--;
+  }
+}
+
+void ReadEncoderLb(){
+  int a= digitalRead(encoderLa);
+  int b= digitalRead(encoderLb);
+  if(!(a^b)){
+    counterL ++;
+  }
+  else{
+    counterL--;
+  }
+}
+
+void ReadEncoderRa(){
+  int a= digitalRead(encoderRa);
+  int b= digitalRead(encoderRb);
+  if(a^b){
+    counterR++;
+  }
+  else{
+    counterR--;
+  }
+}
+
+void ReadEncoderRb(){
+  int a= digitalRead(encoderRa);
+  int b= digitalRead(encoderRb);
+  if(!(a^b)){
+    counterR ++;
+  }
+  else{
+    counterR--;
+  }
+}
+
+
+float tickstomm(float ticks){
+  return ticks* tickmm;
+  }
+  
+float mmtoticks(float mm){
+  return mm/tickmm;
+  }
+
+
+
+void moveRobot(float setpoint){
+  while (((tickstomm(counterR)+tickstomm(counterL))/2)  < setpoint ){
+      moveMR(setpoint);
+      moveML(setpoint);  
+  }
+    
+
+
+}
+void moveMR(float setpoint){
+    now = millis();
+    dt= now - lastTime;
+    error = setpoint - tickstomm(counterR);
+    Integral += error * dt;
+    Derivate= (error-prevError) /dt;
+    output = kpR * error + kiR *Integral+ kdR * Derivate;
+    if (output>255){output=255;}
+    if (output<-255){output=-255;}
+
+    if (output>0)
+    {
+      analogWrite(MR1,abs(output)); 
+      analogWrite(MR2,0); 
+    }
+    else
+    {
+      analogWrite(MR2,abs(output)); 
+      analogWrite(MR1,0); 
+    }
+
+
+    prevError =error;
+    lastTime =now;
+ }
+ 
+ 
+ 
+ void moveML(float setpoint){
+    now = millis();
+    dt= now - lastTime;
+    error = setpoint - vitesse;
+    Integral += error*dt ;
+    Derivate= (error-prevError)/dt ;
+    output = kpL * error + kiL *Integral+ kdL * Derivate;
+    if (output>255){output=255;}
+    if (output<-255){output=-255;}
+
+    if (output>0)
+    {
+      analogWrite(ML1,abs(output)); 
+      analogWrite(ML2,0); 
+    }
+    else
+    {
+      analogWrite(ML2,abs(output)); 
+      analogWrite(ML1,0); 
+    }
+    Serial.println(output);
+    prevError =error;
+    lastTime =now;
+ }
+ 
+void  tournerDroit(){
+    float theta = 0;
+    float deltaTheta=0;
+    float prevR=tickstomm(counterR);
+    float prevL=tickstomm(counterL);
+    float distance=(pi/2)*(center_distance);
+    while ((abs(theta))<(pi/2)){
+        moveML(distance);
+        moveMR(-distance);
+        deltaTheta=((counterR-prevR)-(counterL-prevL))/(2*center_distance);
+        prevL=counterL;
+        prevR=counterR; 
+        theta+=deltaTheta; 
+    }
+}
+void  tournerGauche(){
+    float theta = 0;
+    float deltaTheta=0;
+    float prevR=tickstomm(counterR);
+    float prevL=tickstomm(counterL);
+    float distance=(pi/2)*(center_distance);
+    while ((abs(theta))<(pi/2)){
+        moveML(-distance);
+        moveMR(distance);
+        deltaTheta=((counterR-prevR)-(counterL-prevL))/(2*center_distance);
+        prevL=counterL;
+        prevR=counterR; 
+        theta+=deltaTheta; 
+    }   
+}
+
+void laser(){
+  digitalWrite(laserpin,HIGH);
+  delay(1000);
+  digitalWrite(laserpin,LOW);
+}
+
+
+void ultrason(){
+  digitalWrite(trig,HIGH);
+  delay(10);
+  digitalWrite(trig,LOW);
+  long int mes=pulseIn(echo,HIGH);
+  distancePlaquemm= (mes * 0.34) / 2;
+}
